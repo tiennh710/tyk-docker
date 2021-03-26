@@ -1,0 +1,34 @@
+FROM centos:centos7
+
+# Deletes a number of unit files which might cause issues
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
+systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+rm -f /lib/systemd/system/multi-user.target.wants/*;\
+rm -f /etc/systemd/system/*.wants/*;\
+rm -f /lib/systemd/system/local-fs.target.wants/*; \
+rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+rm -f /lib/systemd/system/basic.target.wants/*;\
+rm -f /lib/systemd/system/anaconda.target.wants/*;
+
+# Set up YUM Repositories
+RUN yum -y install pygpgme yum-utils wget epel-release httpd; yum clean all; systemctl enable httpd.service
+RUN yum -y update
+
+# Configure Tyk Pump
+RUN touch /etc/yum.repos.d/tyk_tyk-pump.repo
+RUN echo -e "[tyk_tyk-pump]\nname=tyk_tyk-pump\nbaseurl=https://packagecloud.io/tyk/tyk-pump/el/7/\$basearch\nrepo_gpgcheck=1\ngpgcheck=1\nenabled=1\ngpgkey=https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 \n       https://packagecloud.io/tyk/tyk-pump/gpgkey\nsslverify=1\nsslcacert=/etc/pki/tls/certs/ca-bundle.crt\nmetadata_expire=300" > /etc/yum.repos.d/tyk_tyk-pump.repo
+
+# Update your local cache
+RUN yum -q makecache -y --disablerepo='*' --enablerepo='tyk_tyk-pump'
+
+# Install Packages
+RUN yum install -y tyk-pump
+RUN /opt/tyk-pump/install/setup.sh --redishost=127.0.0.1 --redisport=6379 --mongo=mongodb://127.0.0.1:27017/tyk_analytics
+RUN systemctl enable tyk-pump
+
+VOLUME ["/opt/tyk-pump/"]
+
+WORKDIR /opt/tyk-pump
+
+CMD ["/opt/tyk-pump/tyk-pump", "-c", "/opt/tyk-pump/pump.conf"]

@@ -1,0 +1,64 @@
+version: '3.3'
+services:
+  tyk-dashboard:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile-dashboard
+    ports:
+    - "3000:3000"
+    - "5000:5000"
+    networks:
+    - tyk
+    depends_on:
+    - tyk-redis
+    - tyk-mongo
+    volumes:
+    - ./confs/tyk_analytics.conf:/opt/tyk-dashboard/tyk_analytics.conf  
+  tyk-gateway:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile-gateway
+    ports:
+    - "8080:8080"
+    networks:
+    - tyk
+    depends_on:
+    - tyk-redis  
+    volumes:
+    - ./confs/tyk.conf:/opt/tyk-gateway/tyk.conf
+    - ./middleware:/opt/tyk-gateway/middleware
+  tyk-pump:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile-pump
+    networks:
+    - tyk
+    depends_on:
+    - tyk-redis
+    - tyk-mongo
+    volumes:
+    - ./confs/pump.conf:/opt/tyk-pump/pump.conf
+  tyk-redis:
+    image: redis
+    ports:
+    - "6379:6379"
+    volumes:
+    - redis-data:/data
+    networks:
+    - tyk
+  tyk-mongo:
+    image: mongo:3.2
+    command: ["mongod", "--smallfiles"]
+    ports:
+    - "27017:27017"
+    volumes:
+    - mongo-data:/data/db
+    networks:
+    - tyk
+
+volumes:
+  redis-data:
+  mongo-data:
+
+networks:
+  tyk:
